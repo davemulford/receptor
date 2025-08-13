@@ -51,7 +51,7 @@ endif
 
 GO ?= go
 
-receptor: $(shell find pkg -type f -name '*.go') ./cmd/receptor-cl/receptor.go
+receptor: $(shell find pkg -type f -name '*.go') ./cmd/receptor-cl/receptor.go ## Build the receptor binary
 	CGO_ENABLED=0 GOFLAGS="-buildvcs=false" $(GO) build \
 		-o receptor \
 		$(DEBUGFLAGS) \
@@ -59,7 +59,7 @@ receptor: $(shell find pkg -type f -name '*.go') ./cmd/receptor-cl/receptor.go
 		$(TAGPARAM) \
 		./cmd/receptor-cl
 
-clean:
+clean: ## Clean all build artifacts
 	@rm -fv .container-flag*
 	@rm -fv .VERSION
 	@rm -fv receptorctl/.VERSION
@@ -79,7 +79,7 @@ OS=linux
 
 KUBECTL_BINARY=./kubectl
 STABLE_KUBECTL_VERSION=$(shell curl --silent https://storage.googleapis.com/kubernetes-release/release/stable.txt)
-kubectl:
+kubectl: ## Installs kubectl
 	if [ "$(wildcard $(KUBECTL_BINARY))" != "" ]; \
 	then \
 		FOUND_KUBECTL_VERSION=$$(./kubectl version --client=true | head --lines=1 | cut --delimiter=' ' --field=3); \
@@ -98,32 +98,32 @@ kubectl:
 GOLANGCI_LINT_VERSION ?= v1.60.3
 GOLANGCI_LINT_BINARY := $(shell go env GOPATH)/bin/golangci-lint
 
-lint: $(GOLANGCI_LINT_BINARY)
+lint: $(GOLANGCI_LINT_BINARY) ## Runs golangci-lint on the cmd, pkg, and example directories
 	@$(GOLANGCI_LINT_BINARY) run cmd/... pkg/... example/...
 
 $(GOLANGCI_LINT_BINARY):
 	@echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
 	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(shell go env GOPATH)/bin $(GOLANGCI_LINT_VERSION)
 
-receptorctl-lint: receptor
+receptorctl-lint: receptor ## Runs linting on receptorctl
 	@cd receptorctl && nox -s lint
 
-format:
+format: ## Runs 'go fmt' in the cmd and pkg directories
 	@find cmd/ pkg/ -type f -name '*.go' -exec $(GO) fmt {} \;
 
-fmt: format
+fmt: format ## Same as `make format`
 
-generate:
+generate: ## Runs `go generate` to generate mock files
 	${GO} generate  ./...
 
-generate-clean:
+generate-clean: ## Removes generated mock files
 	@echo "Removing existing mocks"
 	@find . -type d -name 'mock*' -prune -exec rm -rf {} +
 
-pre-commit:
+pre-commit: ## Runs a pre-commit hook
 	@pre-commit run --all-files
 
-build-all:
+build-all: ## Builds receptor on all supported platforms
 	@echo "Running Go builds..." && \
 	GOOS=windows $(GO) build \
 		-o receptor.exe \
@@ -143,7 +143,7 @@ CHECKSUM_PROGRAM='sha256sum'
 GOARCH=$(ARCH)
 GOOS=$(OS)
 DIST := receptor_$(shell echo '$(VERSION)' | sed 's/^v//')_$(GOOS)_$(GOARCH)
-build-package:
+build-package: ## Creates a tar.gz with the receptor binary distribution
 	@echo "Building and packaging binary for $(GOOS)/$(GOARCH) as dist/$(DIST).tar.gz" && \
 	mkdir -p dist/$(DIST) && \
 	GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=0 $(GO) build \
@@ -166,7 +166,7 @@ endif
 BLOCKLIST='/tests/|mock_|example'
 COVERAGE_FILE='coverage.txt'
 
-coverage: build-all
+coverage: build-all ## Produces a `go test` coverage file
 	PATH="${PWD}:${PATH}" \
 		$(GO) test $$($(GO) list ./... | grep -vE $(BLOCKLIST)) \
 		$(TESTCMD) \
@@ -177,7 +177,7 @@ coverage: build-all
 		-race \
 		-timeout 5m
 
-test: receptor
+test: receptor ## Runs unit and integration tests
 	PATH="${PWD}:${PATH}" \
 		$(GO) test $$($(GO) list ./...) \
 		$(TESTCMD) \
@@ -185,35 +185,35 @@ test: receptor
 		-race \
 		-timeout 5m
 
-receptorctl-test: receptor
+receptorctl-test: receptor ## Runs tests for the receptorctl project
 	@cd receptorctl && nox -s tests
 
-testloop: receptor
+testloop: receptor ## Runs `make test` in a loop
 	@i=1; while echo "------ $$i" && \
 	  make test; do \
 	  i=$$((i+1)); done
 
-kubetest: kubectl
+kubetest: kubectl ## Runs `kubectl get nodes` on the current k8s context
 	./kubectl get nodes
 
-version:
+version: ## Prints the version
 	@echo $(VERSION) > .VERSION
 	@echo ".VERSION created for $(VERSION)"
 
 RECEPTORCTL_WHEEL = receptorctl/dist/receptorctl-$(VERSION:v%=%)-py3-none-any.whl
-$(RECEPTORCTL_WHEEL): $(shell find receptorctl/receptorctl -type f -name '*.py')
+$(RECEPTORCTL_WHEEL): $(shell find receptorctl/receptorctl -type f -name '*.py') ## Creates a Python whl file for receptorctl
 	@cd receptorctl && SETUPTOOLS_SCM_PRETEND_VERSION_FOR_RECEPTORCTL=$(VERSION) python3 -m build --wheel
 
 receptorctl_wheel: $(RECEPTORCTL_WHEEL)
 
 RECEPTORCTL_SDIST = receptorctl/dist/receptorctl-$(VERSION:v%=%).tar.gz
-$(RECEPTORCTL_SDIST): $(shell find receptorctl/receptorctl -type f -name '*.py')
+$(RECEPTORCTL_SDIST): $(shell find receptorctl/receptorctl -type f -name '*.py') ## Creates a Python source distribution for receptorctl
 	@cd receptorctl && SETUPTOOLS_SCM_PRETEND_VERSION_FOR_RECEPTORCTL=$(VERSION) python3 -m build --sdist
 
 receptorctl_sdist: $(RECEPTORCTL_SDIST)
 
 RECEPTOR_PYTHON_WORKER_WHEEL = receptor-python-worker/dist/receptor_python_worker-$(VERSION:v%=%)-py3-none-any.whl
-$(RECEPTOR_PYTHON_WORKER_WHEEL): $(shell find receptor-python-worker/receptor_python_worker -type f -name '*.py')
+$(RECEPTOR_PYTHON_WORKER_WHEEL): $(shell find receptor-python-worker/receptor_python_worker -type f -name '*.py') ## Creates a Python whl file for receptor-python-worker
 	@cd receptor-python-worker && SETUPTOOLS_SCM_PRETEND_VERSION_FOR_RECEPTOR_PYTHON_WORKER=$(VERSION) python3 -m build --wheel
 
 # Container command can be docker or podman
@@ -230,7 +230,7 @@ EXTRA_OPTS ?=
 
 space := $(subst ,, )
 CONTAINER_FLAG_FILE = .container-flag-$(VERSION)$(subst $(space),,$(subst /,,$(EXTRA_OPTS)))
-container: $(CONTAINER_FLAG_FILE)
+container: $(CONTAINER_FLAG_FILE) ## Builds a new receptor container
 $(CONTAINER_FLAG_FILE): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
 	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
 	@cp $(RECEPTORCTL_WHEEL) packaging/container
@@ -238,8 +238,13 @@ $(CONTAINER_FLAG_FILE): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
 	$(CONTAINERCMD) build $(EXTRA_OPTS) packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,)
 	touch $@
 
-tc-image: container
+tc-image: container ## Builds a tc-image container
 	@cp receptor packaging/tc-image/
 	@$(CONTAINERCMD) build packaging/tc-image -t receptor-tc
 
-.PHONY: lint format fmt pre-commit build-all test clean testloop container version receptorctl-tests kubetest
+help: ## Show this help message
+	@grep -hE '^[a-zA-Z0-9._-]+:.*?##' $(MAKEFILE_LIST) | \
+	awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-16s\033[0m %s\n", $$1, $$2}' | \
+	sort
+
+.PHONY: help lint format fmt pre-commit build-all test clean testloop container version receptorctl-tests kubetest
